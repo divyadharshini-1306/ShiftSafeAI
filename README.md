@@ -1,8 +1,8 @@
 # ShiftSafeAI
 # ShiftSafe AI — Model & Data Pipeline Handoff
-### For: Aadish Sarin (Backend Lead)
-### From: Divyadarshini (ML Lead) + Atharvi (Data Pipeline Lead)
-### Last updated: June 2026
+### 
+### 
+### 
 
 ---
 
@@ -31,7 +31,7 @@ All files are in: `ShiftSafe_AI/models/`
 
 Download all 5 files and put them in a folder called `models/` inside your FastAPI project directory.
 
-Also get from Atharvi:
+Also get from data pipeline:
 - `aqi_sensor.db` — the SQLite database with 48,189 rows of Bengaluru AQI data
 - `data_pipeline.ipynb` — Atharvi's pipeline notebook for reference
 
@@ -180,7 +180,7 @@ def predict_aqi(feature_dict: dict) -> float:
 
 ---
 
-## Section 4 — How to use Atharvi's data pipeline
+## Section 4 — How to use  data pipeline
 
 Atharvi's `get_latest_features()` function connects to the SQLite database and returns the latest sensor reading as the exact 17-key dict the model expects.
 
@@ -374,7 +374,7 @@ Then open `http://localhost:8000/docs` in your browser — FastAPI generates a S
 
 ---
 
-## Section 7 — CORS setup (critical for Likhita)
+## Section 7 — CORS setup (critical for frontend)
 
 You must add CORS middleware to your FastAPI app or Likhita's React frontend will get blocked by the browser when calling your API. Add this to `main.py`:
 
