@@ -1,0 +1,1 @@
+["PM2.5", "PM10", "NO", "NO2", "NH3", "CO", "SO2", "O3", "hour", "month", "day_of_week", "is_weekend", "is_shift_hour", "AQI_lag1", "AQI_lag3", "PM25_rolling6", "AQI_rolling6"]
