@@ -33,6 +33,11 @@ app.add_middleware(
 )
 
 
+@app.get("/ping")
+def ping():
+    return {"status": "awake"}
+
+
 @app.get("/")
 def root():
     return {
