@@ -32,8 +32,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Fix: Accept GET, POST, and HEAD methods
-@app.api_route("/ping", methods=["GET", "POST", "HEAD"])
+# Keep ping HEAD-only
+@app.head("/ping")
 def ping():
     return {"status": "awake"}
 
