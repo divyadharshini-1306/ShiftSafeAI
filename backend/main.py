@@ -1,10 +1,11 @@
-
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from background import run_ingestion_loop
 from exposure import MET_VALUES, calculate_exposure, get_risk_tier
 from pipeline import get_latest_features
 from predict import predict_aqi
@@ -25,6 +26,13 @@ app.add_middleware(
 )
 
 
+# ── Startup: begin live IoT ingestion loop ───────────────────────────────────
+@app.on_event("startup")
+async def start_background_tasks():
+    asyncio.create_task(run_ingestion_loop())
+
+
+# ── Pydantic request models ──────────────────────────────────────────────────
 class PredictRequest(BaseModel):
     worker_role: str = Field(
         ...,
@@ -48,9 +56,9 @@ class RiskScoreRequest(BaseModel):
     )
 
 
+# ── Shared helpers ───────────────────────────────────────────────────────────
 def validate_worker_role(worker_role: str) -> str:
     role = worker_role.strip().lower()
-
     if role not in MET_VALUES:
         raise HTTPException(
             status_code=422,
@@ -59,17 +67,15 @@ def validate_worker_role(worker_role: str) -> str:
                 f"Choose one of: {', '.join(MET_VALUES)}"
             ),
         )
-
     return role
 
 
 def get_current_prediction() -> tuple[float, dict]:
-    """Database -> 17 raw features -> loaded XGBoost + Bi-GRU ensemble."""
+    """Database → 17 raw features → XGBoost + Bi-GRU ensemble prediction."""
     try:
         features = get_latest_features()
         predicted_aqi = predict_aqi(features)
         return predicted_aqi, features
-
     except Exception as error:
         raise HTTPException(
             status_code=500,
@@ -79,16 +85,17 @@ def get_current_prediction() -> tuple[float, dict]:
 
 def hourly_aqi_offset(hour: int) -> float:
     """
-    Simple schedule adjustment based on observed hourly AQI patterns.
-    Hours are in 24-hour local time.
+    AQI offset per hour based on observed Bengaluru patterns (EDA finding).
+    Evening hours 17-23 carry the highest exposure risk.
+    Morning hours 7-10 are the cleanest window.
     """
     if 7 <= hour <= 10:
-        return -8.0
+        return -8.0   # morning clean window — best time for heavy outdoor work
     if 11 <= hour <= 16:
-        return 0.0
-    if 17 <= hour <= 22:
-        return 12.0
-    return -3.0
+        return 0.0    # midday baseline
+    if 17 <= hour <= 23:
+        return 12.0   # evening peak — worst for workers (FIX 3: was 17-22)
+    return -3.0       # midnight to 6am — low activity, moderate AQI
 
 
 def get_shift_risk_level(predicted_aqi: float) -> str:
@@ -107,11 +114,14 @@ def recommended_intensity(risk_level: str, hour: int) -> str:
     return "Rest" if hour >= 18 else "Light"
 
 
+# ── Endpoints ────────────────────────────────────────────────────────────────
 @app.get("/")
 def root():
     return {
         "service": "ShiftSafe AI Backend",
         "status": "running",
+        "version": "1.0.0",
+        "endpoints": ["/predict", "/risk-score", "/shift-plan", "/health", "/docs"],
     }
 
 
@@ -120,15 +130,15 @@ def health_check():
     return {
         "status": "healthy",
         "model": "XGBoost + Bi-GRU ensemble",
+        "ensemble_weights": {"xgboost": 0.9, "bigru": 0.1},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
 @app.post("/predict")
 def predict(request: PredictRequest):
     validate_worker_role(request.worker_role)
-
     predicted_aqi, features = get_current_prediction()
-
     return {
         "predicted_aqi": predicted_aqi,
         "hour": features["hour"],
@@ -139,7 +149,6 @@ def predict(request: PredictRequest):
 @app.post("/risk-score")
 def risk_score(request: RiskScoreRequest):
     role = validate_worker_role(request.worker_role)
-
     predicted_aqi, _ = get_current_prediction()
 
     exposure_score = calculate_exposure(
@@ -147,7 +156,6 @@ def risk_score(request: RiskScoreRequest):
         shift_duration_hours=request.shift_duration_hours,
         worker_role=role,
     )
-
     risk = get_risk_tier(exposure_score)
 
     return {
@@ -173,20 +181,16 @@ def shift_plan(
     base_aqi, _ = get_current_prediction()
 
     schedule = []
-
     for offset in range(8):
         hour = (shift_start_hour + offset) % 24
         hour_aqi = round(max(0.0, base_aqi + hourly_aqi_offset(hour)), 1)
         risk_level = get_shift_risk_level(hour_aqi)
-
-        schedule.append(
-            {
-                "hour": hour,
-                "predicted_aqi": hour_aqi,
-                "risk_level": risk_level,
-                "recommended_intensity": recommended_intensity(risk_level, hour),
-            }
-        )
+        schedule.append({
+            "hour": hour,
+            "predicted_aqi": hour_aqi,
+            "risk_level": risk_level,
+            "recommended_intensity": recommended_intensity(risk_level, hour),
+        })
 
     return {
         "worker_role": role,
