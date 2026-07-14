@@ -33,9 +33,9 @@ app.add_middleware(
 )
 
 # Fix: Accept GET, POST, and HEAD methods
-@app.route("/ping", methods=["GET", "POST", "HEAD"])
-def ping_service(request):
-    return {"status": "alive"}
+@app.api_route("/ping", methods=["GET", "POST", "HEAD"])
+def ping():
+    return {"status": "awake"}
 
 @app.get("/")
 def root():
