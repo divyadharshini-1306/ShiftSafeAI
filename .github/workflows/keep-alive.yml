@@ -12,4 +12,4 @@ jobs:
       - name: Ping ShiftSafe AI backend
         run: |
           echo "Pinging service at $(date)"
-          curl -s -o /dev/null -w "Status: %{http_code}\n" --max-time 60 https://shiftsafeai.onrender.com/ping
+          curl -s -o /dev/null -w "Status: %{http_code}\n" --max-time 60 https://shiftsafe-api.onrender.com/health
