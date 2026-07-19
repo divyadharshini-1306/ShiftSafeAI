@@ -9,6 +9,7 @@ from background import run_ingestion_loop
 from exposure import MET_VALUES, calculate_exposure, get_risk_tier
 from pipeline import get_latest_features
 from predict import predict_aqi
+from db_utils import get_recent_rows
 
 
 app = FastAPI(
@@ -196,4 +197,32 @@ def shift_plan(
         "worker_role": role,
         "shift_start_hour": shift_start_hour,
         "schedule": schedule,
+    }
+
+@app.get("/demo/latest-readings")
+def latest_readings(n: int = 10):
+    """
+    Demo endpoint — shows the n most recent rows in aqi_sensor.db.
+    Use this to verify the OpenWeather ingestion pipeline is working.
+    The newest row should have a Datetime close to the current IST time.
+    Default: last 10 rows. Max recommended: 50.
+    """
+    if n > 50:
+        raise HTTPException(
+            status_code=400,
+            detail="n must be 50 or less to keep the response readable."
+        )
+
+    rows = get_recent_rows(n)
+
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="No rows found in sensor_data table."
+        )
+
+    return {
+        "total_rows_returned": len(rows),
+        "note": "Ordered newest first. Datetime is IST. AQI is CPCB scale (0-500).",
+        "readings": rows,
     }
