@@ -148,7 +148,7 @@ def risk_score(request: RiskScoreRequest):
     role = validate_worker_role(request.worker_role)
     predicted_aqi, _ = get_current_prediction()
 
-    exposure_score = calculate_exposure(
+    exposure_score = calculate_exposure_score(
         predicted_aqi=predicted_aqi,
         shift_duration_hours=request.shift_duration_hours,
         worker_role=role,
