@@ -10,7 +10,7 @@ from exposure import MET_VALUES, calculate_exposure, get_risk_tier
 from pipeline import get_latest_features
 from predict import predict_aqi
 from db_utils import get_recent_rows
-
+from exposure import MET_VALUES, calculate_exposure, calculate_shift_exposure, get_risk_tier
 
 app = FastAPI(
     title="ShiftSafe AI Backend",
@@ -113,6 +113,8 @@ def recommended_intensity(risk_level: str, hour: int) -> str:
     if risk_level == "Moderate":
         return "Moderate"
     return "Rest" if hour >= 18 else "Light"
+
+
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -226,3 +228,74 @@ def latest_readings(n: int = 10):
         "note": "Ordered newest first. Datetime is IST. AQI is CPCB scale (0-500).",
         "readings": rows,
     }
+@app.post("/risk-score")
+def risk_score(request: RiskScoreRequest):
+    role = validate_worker_role(request.worker_role)
+    predicted_aqi, _ = get_current_prediction()
+    now_utc = datetime.now(timezone.utc)
+
+    # Use new calculate_exposure — now accounts for fatigue and AQI penalty
+    exposure_score = calculate_exposure(
+        predicted_aqi=predicted_aqi,
+        shift_duration_hours=request.shift_duration_hours,
+        worker_role=role,
+    )
+    risk = get_risk_tier(exposure_score)
+
+    return {
+        "exposure_score":  exposure_score,
+        "risk_tier":       risk["tier"],
+        "directive":       risk["directive"],
+        "predicted_aqi":   predicted_aqi,
+        "timestamp_utc":   now_utc.isoformat(),
+        "timestamp_ist":   now_utc.astimezone(IST).isoformat(),
+        "model_note": (
+            "Exposure score uses non-linear AQI penalty (power 1.2) "
+            "and step-based fatigue progression."
+        ),
+    }
+class ShiftExposureRequest(BaseModel):
+    worker_role: str = Field(
+        ...,
+        description="construction, traffic_police, factory, or delivery",
+        examples=["construction"],
+    )
+    hourly_aqi_list: list[float] = Field(
+        ...,
+        description="Predicted AQI for each hour of the shift. Length = shift duration.",
+        examples=[[87.2, 89.1, 94.5, 98.3, 92.1, 88.7, 105.2, 110.4]],
+    )
+    breaks: list[dict] | None = Field(
+        default=None,
+        description=(
+            "Optional indoor recovery breaks. Each break: "
+            "{'after_hour': int, 'duration_min': float}"
+        ),
+        examples=[[{"after_hour": 4, "duration_min": 45}]],
+    )
+
+
+@app.post("/shift-exposure")
+def shift_exposure(request: ShiftExposureRequest):
+    """
+    Detailed per-hour cumulative exposure breakdown for a full shift.
+    Accounts for fatigue progression, non-linear AQI penalty, and
+    recovery breaks. Use this endpoint to power the dashboard's
+    Exposure Budget Meter with full hourly detail.
+    """
+    role = validate_worker_role(request.worker_role)
+
+    if len(request.hourly_aqi_list) > 12:
+        raise HTTPException(
+            status_code=400,
+            detail="hourly_aqi_list cannot exceed 12 hours."
+        )
+
+    result = calculate_shift_exposure(
+        hourly_aqi_list=request.hourly_aqi_list,
+        worker_role=role,
+        breaks=request.breaks,
+    )
+
+    return result
+
