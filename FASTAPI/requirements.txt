@@ -1,8 +1,11 @@
+
 fastapi
-uvicorn
+uvicorn[standard]
 xgboost
 torch
 scikit-learn
 pandas
 numpy
 pydantic
+apscheduler
+requests
