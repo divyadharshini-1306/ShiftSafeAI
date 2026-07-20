@@ -9,7 +9,7 @@ import os
 import sqlite3
 
 from background import run_ingestion_loop, _history_features, _time_features, _ingest_one_cycle
-from exposure import MET_VALUES, calculate_exposure, get_risk_tier
+from exposure import MET_VALUES, calculate_exposure_score, get_risk_tier
 from pipeline import get_latest_features
 from predict import predict_aqi
 import weather
