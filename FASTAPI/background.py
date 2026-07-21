@@ -16,8 +16,7 @@ role, duration, or time clicked.
 import asyncio
 import os
 import sqlite3
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
 import weather
 from predict import predict_aqi
 
@@ -99,8 +98,11 @@ def _ingest_one_cycle() -> None:
     cur = _conn.cursor()
 
     pollutants = weather.fetch_current_pollution()
-    now = datetime.now(timezone.utc)
 
+    # Create IST Timezone (+05:30)
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist)
+    
     features = {}
     features.update(pollutants)
     features.update(_time_features(now))

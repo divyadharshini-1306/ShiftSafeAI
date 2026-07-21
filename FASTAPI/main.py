@@ -160,8 +160,8 @@ def risk_score(request: RiskScoreRequest):
 
     return {
         "exposure_score": exposure_score,
-        "risk_tier": risk["tier"],
-        "directive": risk["directive"],
+        "risk_tier": risk[0], 
+        "directive": risk[1],
         "predicted_aqi": predicted_aqi,
     }
 
