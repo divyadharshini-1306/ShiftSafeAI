@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShiftSafe AI — Worker AQI Exposure Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Compiler -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const WORKER_ROLES = [
+      { id: 'construction', label: 'Construction Worker', met: '5.0 METs (Heavy Outdoor)' },
+      { id: 'traffic_police', label: 'Traffic Police', met: '3.0 METs (Standing/Walking)' },
+      { id: 'factory', label: 'Factory Worker', met: '4.0 METs (Assembly/Labour)' },
+      { id: 'delivery', label: 'Delivery Executive', met: '6.0 METs (Cycling with Load)' }
+    ];
+
+    function App() {
+      // API Settings
+      const [backendUrl, setBackendUrl] = useState(localStorage.getItem('shiftsafe_backend_url') || 'http://localhost:8000');
+      const [customUrl, setCustomUrl] = useState(backendUrl);
+      const [serverHealth, setServerHealth] = useState(null);
+      const [isConnecting, setIsConnecting] = useState(false);
+      const [errorMsg, setErrorMsg] = useState('');
+
+      // Form States
+      const [selectedRole, setSelectedRole] = useState('construction');
+      const [shiftDuration, setShiftDuration] = useState(8);
+      const [startHour, setStartHour] = useState(6);
+
+      // Endpoint Responses
+      const [predictData, setPredictData] = useState(null);
+      const [riskData, setRiskData] = useState(null);
+      const [planData, setShiftPlanData] = useState(null);
+
+      // Loading States
+      const [loadingPredict, setLoadingPredict] = useState(false);
+      const [loadingRisk, setLoadingRisk] = useState(false);
+      const [loadingPlan, setLoadingPlan] = useState(false);
+
+      const chartRef = useRef(null);
+      const chartInstanceRef = useRef(null);
+
+      // Check backend health
+      const checkHealth = async (urlToTest = backendUrl) => {
+        setIsConnecting(true);
+        setErrorMsg('');
+        try {
+          const res = await fetch(`${urlToTest.replace(/\/$/, '')}/health`);
+          if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+          const data = await res.json();
+          setServerHealth(data);
+          setBackendUrl(urlToTest);
+          localStorage.setItem('shiftsafe_backend_url', urlToTest);
+        } catch (err) {
+          setServerHealth(null);
+          setErrorMsg(`Could not connect to backend at ${urlToTest}. Ensure CORS is enabled and server is running.`);
+        } finally {
+          setIsConnecting(false);
+        }
+      };
+
+      useEffect(() => {
+        checkHealth(backendUrl);
+      }, []);
+
+      // Fetch /predict
+      const handleFetchPredict = async () => {
+        setLoadingPredict(true);
+        setErrorMsg('');
+        try {
+          const res = await fetch(`${backendUrl}/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ worker_role: selectedRole })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          setPredictData(data);
+        } catch (err) {
+          setErrorMsg(`Predict Endpoint Error: ${err.message}`);
+        } finally {
+          setLoadingPredict(false);
+        }
+      };
+
+      // Fetch /risk-score
+      const handleFetchRisk = async () => {
+        setLoadingRisk(true);
+        setErrorMsg('');
+        try {
+          const res = await fetch(`${backendUrl}/risk-score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              worker_role: selectedRole,
+              shift_duration_hours: parseFloat(shiftDuration)
+            })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          setRiskData(data);
+        } catch (err) {
+          setErrorMsg(`Risk Score Error: ${err.message}`);
+        } finally {
+          setLoadingRisk(false);
+        }
+      };
+
+      // Fetch /shift-plan
+      const handleFetchShiftPlan = async () => {
+        setLoadingPlan(true);
+        setErrorMsg('');
+        try {
+          const res = await fetch(
+            `${backendUrl}/shift-plan?worker_role=${selectedRole}&shift_start_hour=${startHour}`
+          );
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          setShiftPlanData(data);
+          renderChart(data.schedule);
+        } catch (err) {
+          setErrorMsg(`Shift Plan Error: ${err.message}`);
+        } finally {
+          setLoadingPlan(false);
+        }
+      };
+
+      // Render Chart.js
+      const renderChart = (schedule) => {
+        if (!chartRef.current) return;
+        if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+
+        const labels = schedule.map(item => `${item.hour}:00`);
+        const aqiValues = schedule.map(item => item.predicted_aqi);
+
+        const ctx = chartRef.current.getContext('2d');
+        chartInstanceRef.current = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Predicted AQI',
+              data: aqiValues,
+              borderColor: '#38bdf8',
+              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              borderWidth: 3,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 5,
+              pointHoverRadius: 7
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: '#94a3b8' } }
+            },
+            scales: {
+              x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+              y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }
+            }
+          }
+        });
+      };
+
+      const getTierBadge = (tier) => {
+        switch (tier) {
+          case 'Safe': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+          case 'Moderate': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+          case 'High': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+          case 'Critical': return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+          default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+        }
+      };
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Header */}
+          <header className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-800 gap-4">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">
+                ShiftSafe AI Dashboard
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Real-time AQI forecasting & worker occupational exposure risk monitoring
+              </p>
+            </div>
+            
+            {/* Status Pill */}
+            <div className="flex items-center space-x-3 bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl">
+              <span className={`h-3 w-3 rounded-full ${serverHealth ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+              <div>
+                <p className="text-xs text-slate-400">Backend Status</p>
+                <p className="text-sm font-semibold text-slate-200">
+                  {serverHealth ? 'Connected' : 'Disconnected'}
+                </p>
+              </div>
+            </div>
+          </header>
+
+          {/* Backend Connection Bar */}
+          <section className="my-6 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Backend Configuration
+            </h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value)}
+                placeholder="http://localhost:8000"
+              />
+              <button
+                onClick={() => checkHealth(customUrl)}
+                disabled={isConnecting}
+                className="bg-sky-600 hover:bg-sky-500 text-white px-5 py-2 rounded-xl text-sm font-medium transition disabled:opacity-50"
+              >
+                {isConnecting ? 'Testing...' : 'Connect Backend'}
+              </button>
+            </div>
+            {serverHealth && (
+              <div className="mt-3 text-xs text-slate-400 flex flex-wrap gap-4 border-t border-slate-800/80 pt-2">
+                <span><strong>Model:</strong> {serverHealth.model}</span>
+                <span><strong>Weights:</strong> XGB ({serverHealth.ensemble_weights?.xgboost}) / Bi-GRU ({serverHealth.ensemble_weights?.bigru})</span>
+                <span><strong>Server Time:</strong> {new Date(serverHealth.timestamp).toLocaleTimeString()}</span>
+              </div>
+            )}
+          </section>
+
+          {/* Error Alert */}
+          {errorMsg && (
+            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-400 text-sm">
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Controls & Configuration */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 my-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Worker Role
+              </label>
+              <select
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+              >
+                {WORKER_ROLES.map(role => (
+                  <option key={role.id} value={role.id}>
+                    {role.label} ({role.met})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Shift Duration (Hours)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                value={shiftDuration}
+                onChange={(e) => setShiftDuration(e.target.value)}
+              />
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Shift Start Hour (0 - 23)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="23"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                value={startHour}
+                onChange={(e) => setStartHour(e.target.value)}
+              />
+            </div>
+          </section>
+
+          {/* Action Trigger Cards */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 my-6">
+            
+            {/* 1. Live Predict */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-200">1. Current AQI Predict</h3>
+                <p className="text-xs text-slate-400 mt-1">Queries <code className="text-sky-400">POST /predict</code> for next-hour AQI.</p>
+                {predictData && (
+                  <div className="mt-4 p-4 bg-slate-950 rounded-xl border border-slate-800">
+                    <div className="text-xs text-slate-400">Predicted AQI</div>
+                    <div className="text-3xl font-bold text-sky-400">{predictData.predicted_aqi}</div>
+                    <div className="text-xs text-slate-500 mt-1">Current Hour: {predictData.hour}:00</div>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleFetchPredict}
+                disabled={loadingPredict}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-100 py-2.5 rounded-xl text-sm font-medium transition"
+              >
+                {loadingPredict ? 'Running Ensemble...' : 'Get Current Prediction'}
+              </button>
+            </div>
+
+            {/* 2. Exposure Risk Score */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-200">2. Risk Score Calculator</h3>
+                <p className="text-xs text-slate-400 mt-1">Queries <code className="text-sky-400">POST /risk-score</code> with MET scaling.</p>
+                {riskData && (
+                  <div className="mt-4 p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-400">Exposure Score</span>
+                      <span className="text-lg font-bold text-slate-100">{riskData.exposure_score}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-400">Risk Tier</span>
+                      <span className={`text-xs px-2.5 py-1 rounded-full border ${getTierBadge(riskData.risk_tier)} font-semibold`}>
+                        {riskData.risk_tier}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 pt-1 border-t border-slate-900">
+                      <strong>Directive:</strong> {riskData.directive}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleFetchRisk}
+                disabled={loadingRisk}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-100 py-2.5 rounded-xl text-sm font-medium transition"
+              >
+                {loadingRisk ? 'Calculating Score...' : 'Calculate Risk Score'}
+              </button>
+            </div>
+
+            {/* 3. Shift Planner */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-200">3. 8-Hour Shift Planner</h3>
+                <p className="text-xs text-slate-400 mt-1">Queries <code className="text-sky-400">GET /shift-plan</code> for hourly schedule.</p>
+                {planData && (
+                  <div className="mt-4 p-4 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-xs text-slate-400">Schedule Status</span>
+                    <div className="text-sm font-semibold text-emerald-400 mt-0.5">8-Hour Forecast Ready</div>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleFetchShiftPlan}
+                disabled={loadingPlan}
+                className="w-full bg-sky-600 hover:bg-sky-500 text-white py-2.5 rounded-xl text-sm font-medium transition"
+              >
+                {loadingPlan ? 'Generating Schedule...' : 'Generate 8-Hour Shift Plan'}
+              </button>
+            </div>
+
+          </section>
+
+          {/* Shift Schedule Visualization & Table */}
+          {planData && (
+            <section className="my-8 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-slate-200 mb-4">
+                Forecasted Shift Schedule & Recommended Intensity
+              </h3>
+
+              {/* Chart */}
+              <div className="h-64 mb-8">
+                <canvas ref={chartRef}></canvas>
+              </div>
+
+              {/* Schedule Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
+                    <tr>
+                      <th className="px-4 py-3 rounded-l-xl">Hour</th>
+                      <th className="px-4 py-3">Predicted AQI</th>
+                      <th className="px-4 py-3">Risk Level</th>
+                      <th className="px-4 py-3 rounded-r-xl">Recommended Intensity</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y border-slate-800">
+                    {planData.schedule.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-800/40">
+                        <td className="px-4 py-3 font-medium text-slate-200">{item.hour}:00</td>
+                        <td className="px-4 py-3 font-semibold text-sky-400">{item.predicted_aqi}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs border ${getTierBadge(item.risk_level)}`}>
+                            {item.risk_level}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-200">
+                          {item.recommended_intensity}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
