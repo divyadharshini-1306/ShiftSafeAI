@@ -116,7 +116,7 @@ def recommended_intensity(risk_level: str, hour: int) -> str:
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {
         "service": "ShiftSafe AI Backend",
