@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 import os
 import sqlite3
 
-from background import run_ingestion_loop, _history_features, _time_features, _ingest_one_cycle
+from background import run_ingestion_loop, _history_features, _time_features, _ingest_one_cycle, init_db
 from exposure import MET_VALUES, calculate_exposure_score, get_risk_tier
 from pipeline import get_latest_features
 from predict import predict_aqi
@@ -35,6 +35,10 @@ app.add_middleware(
 # ── Startup: begin live IoT ingestion loop ───────────────────────────────────
 @app.on_event("startup")
 async def start_background_tasks():
+    # Ensure the schema exists first — on a fresh/ephemeral deploy there may
+    # be no aqi_sensor.db (or an empty one) on disk yet.
+    init_db()
+
     # Populate one real row immediately so the first request after a cold
     # start already has live data instead of waiting up to 5 minutes.
     try:

@@ -33,6 +33,40 @@ FEATURE_COLS = [
 _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 
 
+def init_db() -> None:
+    """Create sensor_data if it doesn't already exist. Safe to call every
+    startup — CREATE TABLE IF NOT EXISTS is a no-op when the table (and any
+    data in it) already exists on disk."""
+    cur = _conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sensor_data (
+            "City" TEXT,
+            "Datetime" TEXT,
+            "PM2.5" REAL,
+            "PM10" REAL,
+            "NO" REAL,
+            "NO2" REAL,
+            "NH3" REAL,
+            "CO" REAL,
+            "SO2" REAL,
+            "O3" REAL,
+            "AQI" REAL,
+            "hour" INTEGER,
+            "month" INTEGER,
+            "day_of_week" INTEGER,
+            "is_weekend" INTEGER,
+            "is_shift_hour" INTEGER,
+            "AQI_lag1" REAL,
+            "AQI_lag3" REAL,
+            "PM25_rolling6" REAL,
+            "AQI_rolling6" REAL
+        )
+        """
+    )
+    _conn.commit()
+
+
 def _time_features(dt: datetime) -> dict:
     return {
         "hour": dt.hour,
