@@ -103,7 +103,7 @@ def _map_pollutants(components: dict) -> dict:
         "NO":    float(components["no"]),
         "NO2":   float(components["no2"]),
         "NH3":   float(components["nh3"]),
-        "CO":    float(components["co"]),
+        "CO":    round(float(components["co"]) / 1000, 3),  # µg/m³ → mg/m³
         "SO2":   float(components["so2"]),
         "O3":    float(components["o3"]),
     }
