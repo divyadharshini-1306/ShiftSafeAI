@@ -9,6 +9,11 @@
 > Project ID 105 · IEEE CS Bangalore Chapter Internship & Mentorship Program 2026 · PES University
 
 **Live backend:** https://shiftsafeai-developement.onrender.com/docs
+</br>
+**Live Frontend:** https://shiftsafe-ai.netlify.app/
+</br>
+Please enter this in the background configurartion: https://shiftsafeai-developement.onrender.com
+
 
 ---
 
