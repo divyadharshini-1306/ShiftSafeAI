@@ -305,9 +305,7 @@ Manasi, Namitha, and Medha are collaborators on adjacent ML/CV coursework and ar
 
 ## Known Issues / TODO
 
-- **Duplicate `/risk-score` route in `backend/main.py`.** The endpoint is defined twice. The second definition (which Python's function-overwrite semantics make the one actually served) references an undefined `IST` variable and reads `now_utc.astimezone(IST)` — this will raise a `NameError` at request time. The first, working definition never executes. Needs one definition removed and `IST` imported from `background.py` (or defined locally) if the UTC/IST timestamp fields are wanted in the response.
 - The Bi-GRU's production inference currently repeats the latest feature row 24 times to build its input sequence, rather than using a genuine rolling 24-hour window from the live pipeline — a documented simplification, not a bug.
-- `/shift-exposure` (the detailed per-hour breakdown endpoint with fatigue + recovery breaks) is present in `main.py` but does not yet appear on the live Render deployment's `/docs` — likely pending a redeploy.
 - Transfer learning was validated via a temporal holdout on the same city, not a genuinely independent second city — documented as a methodological limitation, with real cross-city validation proposed as future work.
 
 ## Roadmap
