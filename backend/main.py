@@ -149,24 +149,7 @@ def predict(request: PredictRequest):
     }
 
 
-@app.post("/risk-score")
-def risk_score(request: RiskScoreRequest):
-    role = validate_worker_role(request.worker_role)
-    predicted_aqi, _ = get_current_prediction()
 
-    exposure_score = calculate_exposure(
-        predicted_aqi=predicted_aqi,
-        shift_duration_hours=request.shift_duration_hours,
-        worker_role=role,
-    )
-    risk = get_risk_tier(exposure_score)
-
-    return {
-        "exposure_score": exposure_score,
-        "risk_tier": risk["tier"],
-        "directive": risk["directive"],
-        "predicted_aqi": predicted_aqi,
-    }
 
 
 @app.get("/shift-plan")
