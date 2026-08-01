@@ -14,6 +14,17 @@
 </br>
 Please enter this in the background configurartion: https://shiftsafeai-developement.onrender.com
 
+##  Application Preview
+
+The following screenshots provide an overview of the ShiftSafe AI application, including the frontend user interface and the backend API.
+
+### Frontend Interface
+<img width="1600" height="684" alt="image" src="https://github.com/user-attachments/assets/88a36638-e5ea-4cf3-b6d8-6f5c3e5e2aaf" />
+<img width="1600" height="739" alt="image" src="https://github.com/user-attachments/assets/7c8ae2ab-5fbd-4731-be67-a4b6c27fb23b" />
+
+
+### Backend API
+<img width="1600" height="704" alt="image" src="https://github.com/user-attachments/assets/49e322ee-4de2-4bd3-a21d-d78da7b6bf11" />
 
 ---
 
