@@ -7,6 +7,7 @@
 [![IEEE CS Bangalore Chapter](https://img.shields.io/badge/IEEE%20CS-Internship%202026-orange)]()
 
 > Project ID 105 · IEEE CS Bangalore Chapter Internship & Mentorship Program 2026 · PES University
+> Created for Intership
 
 **Live backend:** https://shiftsafeai-developement.onrender.com/docs
 </br>
