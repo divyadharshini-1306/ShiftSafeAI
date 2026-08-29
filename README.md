@@ -307,7 +307,7 @@ requests
 
 | Workstream | Owner | Scope |
 |---|---|---|
-| **Machine Learning** | Divyadarshini M.B (ML Lead) | Data cleaning, feature engineering, EDA, XGBoost + Bi-GRU ensemble, transfer learning, model packaging |
+| **Machine Learning** | Divyadarshini M.B | Data cleaning, feature engineering, EDA, XGBoost + Bi-GRU ensemble, transfer learning, model packaging |
 | **Data Pipeline** | Atharvi Desurkar | SQLite live-sensor simulation, KNN imputation for sensor failures, `get_latest_features()` |
 | **Backend (FastAPI)** | Aadish Sarin | REST API, Health Risk Engine wiring, live OpenWeather ingestion, Render.com deployment |
 | **Frontend** | Marella Likhita Sri Durga | React dashboard — AQI forecast chart, Exposure Budget Meter, Shift Planner Simulator, hotspot map |
